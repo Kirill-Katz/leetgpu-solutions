@@ -1,8 +1,12 @@
+#include <__clang_cuda_builtin_vars.h>
 #include <cuda_runtime.h>
 
 __global__ void copy_matrix_kernel(const float* A, float* B, int N) {
+    int idx = blockDim.x * blockIdx.x + threadIdx.x;
 
-
+    if (idx < N * N) {
+        B[idx] = A[idx];
+    }
 }
 
 // A, B are device pointers (i.e. pointers to memory on the GPU)
