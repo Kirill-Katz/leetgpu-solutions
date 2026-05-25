@@ -1,5 +1,6 @@
 #include <__clang_cuda_builtin_vars.h>
 #include <cuda_runtime.h>
+#include <cfloat>
 
 __global__ void matrix_multiplication_kernel(
     const float* A,
@@ -40,6 +41,60 @@ __global__ void matrix_transpose_kernel(
 
     if (r < rows && c < cols) {
         output[c * rows + r] = input[r * cols + c];
+    }
+}
+
+__global__ void get_sum_per_row(const float* input, int M, float* output) {
+    extern __shared__ float shared[];
+
+    int tid = threadIdx.x;
+    int r = blockIdx.x;
+
+    float local_sum = 0.0f;
+
+    for (int c = tid; c < M; c += blockDim.x) {
+        local_sum += input[r * M + c];
+    }
+
+    shared[tid] = local_sum;
+    __syncthreads();
+
+    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            shared[tid] += shared[stride + tid];
+        }
+        __syncthreads();
+    }
+
+    if (tid == 0) {
+        output[r] = shared[0];
+    }
+};
+
+__global__ void get_max_val_per_row(const float* input, int M, float* output) {
+    extern __shared__ float shared[];
+
+    int tid = threadIdx.x;
+    int r = blockIdx.x;
+
+    float local_max = -FLT_MAX;
+
+    for (int c = tid; c < M; c += blockDim.x) {
+        local_max = max(local_max, input[r * M + c]);
+    }
+
+    shared[tid] = local_max;
+    __syncthreads();
+
+    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            shared[tid] = max(shared[tid], shared[tid + stride]);
+        }
+        __syncthreads();
+    }
+
+    if (tid == 0) {
+        output[r] = shared[0];
     }
 }
 
